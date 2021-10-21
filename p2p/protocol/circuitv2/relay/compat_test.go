@@ -19,7 +19,7 @@ import (
 )
 
 func addTransportV1(t *testing.T, ctx context.Context, h host.Host, upgrader *tptu.Upgrader) {
-	err := compatv1.AddRelayTransport(ctx, h, upgrader)
+	err := compatv1.AddRelayTransport(h, upgrader)
 	if err != nil {
 		t.Fatal(err)
 	}

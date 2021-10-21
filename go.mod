@@ -9,7 +9,7 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/huin/goupnp v1.0.2 // indirect
 	github.com/ipfs/go-cid v0.0.7
-	github.com/ipfs/go-datastore v0.4.6
+	github.com/ipfs/go-datastore v0.4.7-0.20211013204805-28a3721c2e66
 	github.com/ipfs/go-ipfs-util v0.0.2
 	github.com/ipfs/go-log/v2 v2.3.0
 	github.com/jbenet/goprocess v0.1.4
@@ -20,18 +20,18 @@ require (
 	github.com/libp2p/go-conn-security-multistream v0.3.0
 	github.com/libp2p/go-eventbus v0.2.1
 	github.com/libp2p/go-libp2p-asn-util v0.1.0
-	github.com/libp2p/go-libp2p-autonat v0.5.0
+	github.com/libp2p/go-libp2p-autonat v0.5.1-0.20211021135006-7e970eb3f79e
 	github.com/libp2p/go-libp2p-blankhost v0.2.0
-	github.com/libp2p/go-libp2p-circuit v0.4.0
+	github.com/libp2p/go-libp2p-circuit v0.4.1-0.20211021135405-9f62fc48c966
 	github.com/libp2p/go-libp2p-core v0.11.0
-	github.com/libp2p/go-libp2p-discovery v0.5.1
+	github.com/libp2p/go-libp2p-discovery v0.5.2-0.20211021135804-b6a744d6c24a
 	github.com/libp2p/go-libp2p-mplex v0.4.1
 	github.com/libp2p/go-libp2p-nat v0.1.0
 	github.com/libp2p/go-libp2p-netutil v0.1.0
 	github.com/libp2p/go-libp2p-noise v0.3.0
-	github.com/libp2p/go-libp2p-peerstore v0.3.0
+	github.com/libp2p/go-libp2p-peerstore v0.3.1-0.20211018221143-8fa6ed334f72
 	github.com/libp2p/go-libp2p-quic-transport v0.14.0
-	github.com/libp2p/go-libp2p-swarm v0.7.0
+	github.com/libp2p/go-libp2p-swarm v0.7.1-0.20211021134106-2c0e1828d1fa
 	github.com/libp2p/go-libp2p-testing v0.5.0
 	github.com/libp2p/go-libp2p-tls v0.3.0
 	github.com/libp2p/go-libp2p-transport-upgrader v0.5.0
