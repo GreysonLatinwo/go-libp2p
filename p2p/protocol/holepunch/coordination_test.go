@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/config"
+
 	"github.com/libp2p/go-libp2p"
 
 	"github.com/libp2p/go-libp2p-core/host"
@@ -26,6 +28,19 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+// makeAddrFactory returns an addr factory that adds a public addr exactly one
+// TODO: emit the event
+func makeAddrFactory() config.AddrsFactory {
+	var private bool
+	return func(addrs []ma.Multiaddr) []ma.Multiaddr {
+		if !private {
+			private = true
+			return addrs
+		}
+		return append(addrs, ma.StringCast("/ip4/1.1.1.1/tcp/1234"))
+	}
+}
 
 type mockEventTracer struct {
 	mutex  sync.Mutex
@@ -312,6 +327,7 @@ func mkHostWithStaticAutoRelay(t *testing.T, ctx context.Context, relay host.Hos
 		libp2p.EnableAutoRelay(),
 		libp2p.ForceReachabilityPrivate(),
 		libp2p.StaticRelays([]peer.AddrInfo{pi}),
+		libp2p.AddrsFactory(makeAddrFactory()),
 	)
 	require.NoError(t, err)
 
@@ -370,7 +386,10 @@ func addHolePunchService(t *testing.T, h host.Host) *holepunch.Service {
 
 func mkHostWithHolePunchSvc(t *testing.T, opts ...holepunch.Option) (host.Host, *holepunch.Service) {
 	t.Helper()
-	h, err := libp2p.New(libp2p.ListenAddrs(ma.StringCast("/ip4/127.0.0.1/tcp/0"), ma.StringCast("/ip6/::1/tcp/0")))
+	h, err := libp2p.New(
+		libp2p.ListenAddrs(ma.StringCast("/ip4/127.0.0.1/tcp/0"), ma.StringCast("/ip6/::1/tcp/0")),
+		libp2p.AddrsFactory(makeAddrFactory()),
+	)
 	require.NoError(t, err)
 	ids, err := identify.NewIDService(h)
 	require.NoError(t, err)

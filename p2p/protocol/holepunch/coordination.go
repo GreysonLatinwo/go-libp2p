@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -56,6 +57,8 @@ type Service struct {
 	closed   bool
 	refCount sync.WaitGroup
 
+	hasPublicAddrsChan chan struct{} // this chan is closed as soon as we have a public address
+
 	// active hole punches for deduplicating
 	activeMx sync.Mutex
 	active   map[peer.ID]struct{}
@@ -71,11 +74,12 @@ func NewService(h host.Host, ids *identify.IDService, opts ...Option) (*Service,
 
 	ctx, cancel := context.WithCancel(context.Background())
 	hs := &Service{
-		ctx:       ctx,
-		ctxCancel: cancel,
-		host:      h,
-		ids:       ids,
-		active:    make(map[peer.ID]struct{}),
+		ctx:                ctx,
+		ctxCancel:          cancel,
+		host:               h,
+		ids:                ids,
+		active:             make(map[peer.ID]struct{}),
+		hasPublicAddrsChan: make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -85,9 +89,41 @@ func NewService(h host.Host, ids *identify.IDService, opts ...Option) (*Service,
 		}
 	}
 
-	h.SetStreamHandler(Protocol, hs.handleNewStream)
+	sub, err := hs.host.EventBus().Subscribe(&event.EvtLocalAddressesUpdated{})
+	if err != nil {
+		return nil, err
+	}
+	hs.refCount.Add(1)
+	go hs.watchForPublicAddr(sub)
+	time.Sleep(time.Second)
+
 	h.Network().Notify((*netNotifiee)(hs))
 	return hs, nil
+}
+
+func (hs *Service) watchForPublicAddr(sub event.Subscription) {
+	defer hs.refCount.Done()
+	defer sub.Close()
+
+	log.Debug("waiting until we have at least one public address", "peer", hs.host.ID())
+
+	for {
+		if containsPublicAddr(hs.host.Addrs()) {
+			log.Debug("Host now has a public address. Starting holepunch protocol.")
+			hs.host.SetStreamHandler(Protocol, hs.handleNewStream)
+			close(hs.hasPublicAddrsChan)
+			return
+		}
+
+		select {
+		case <-hs.ctx.Done():
+			return
+		case _, ok := <-sub.Out():
+			if !ok {
+				return
+			}
+		}
+	}
 }
 
 // Close closes the Hole Punch Service.
@@ -176,7 +212,6 @@ func (hs *Service) beginDirectConnect(p peer.ID) error {
 // It first attempts a direct dial (if we have a public address of that peer), and then
 // coordinates a hole punch over the given relay connection.
 func (hs *Service) DirectConnect(p peer.ID) error {
-	log.Debugw("got inbound proxy conn", "peer", p)
 	if err := hs.beginDirectConnect(p); err != nil {
 		return err
 	}
@@ -221,8 +256,16 @@ func (hs *Service) directConnect(rp peer.ID) error {
 		}
 	}
 
-	if len(hs.ids.OwnObservedAddrs()) == 0 {
+	log.Debugw("got inbound proxy conn", "peer", rp)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	select {
+	case <-hs.ctx.Done():
+		return hs.ctx.Err()
+	case <-ctx.Done():
+		log.Debug("didn't find any public host address")
 		return errors.New("can't initiate hole punch, as we don't have any public addresses")
+	case <-hs.hasPublicAddrsChan:
 	}
 
 	// hole punch
@@ -363,6 +406,16 @@ func (hs *Service) holePunchConnect(pi peer.AddrInfo, isClient bool) error {
 	return nil
 }
 
+func containsPublicAddr(addrs []ma.Multiaddr) bool {
+	for _, addr := range addrs {
+		if isRelayAddress(addr) || !manet.IsPublicAddr(addr) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 func removeRelayAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
 	result := make([]ma.Multiaddr, 0, len(addrs))
 	for _, addr := range addrs {
@@ -414,6 +467,7 @@ func (nn *netNotifiee) Connected(_ network.Network, conn network.Conn) {
 			// that we can dial to for a hole punch.
 			case <-hs.ids.IdentifyWait(conn):
 			case <-hs.ctx.Done():
+				return
 			}
 
 			_ = hs.DirectConnect(conn.RemotePeer())
