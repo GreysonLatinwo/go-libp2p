@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 
@@ -88,23 +89,28 @@ func (cr *ChatRoom) ListPeers() []peer.ID {
 // readLoop pulls messages from the pubsub topic and pushes them onto the Messages channel.
 func (cr *ChatRoom) readLoop() {
 	for {
+		c, _ := net.Dial("tcp", "127.0.0.1:2023")
 		msg, err := cr.sub.Next(cr.ctx)
 		if err != nil {
 			close(cr.Messages)
 			return
-		}
-		// only forward messages delivered by others
-		if msg.ReceivedFrom == cr.self {
-			continue
 		}
 		cm := new(ChatMessage)
 		err = json.Unmarshal(msg.Data, cm)
 		if err != nil {
 			continue
 		}
+		setLedColor(c, cm)
+		if msg.ReceivedFrom == cr.self {
+			continue
+		}
 		// send valid messages onto the Messages channel
 		cr.Messages <- cm
 	}
+}
+
+func setLedColor(c net.Conn, cm *ChatMessage) {
+	c.Write([]byte(cm.Message))
 }
 
 func topicName(roomName string) string {
